@@ -1,0 +1,6 @@
+modFolder = "./test/mods"
+sourceURL_from = [
+    "sources",
+]
+downloadSource = "Github"
+update_from = "Modrinth"
