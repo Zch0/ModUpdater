@@ -124,7 +124,7 @@ def check_update(stdscr: Any) -> None:
             current_version_number = get_mod_info.get_mod_version_number(current_version) or "?"
             project_id = get_mod_info.get_mod_project_id(current_version)
             if not project_id:return current_version_number, "?"
-            latest_version = get_mod_info.get_mod_latest_version(project_id, config.get("current_version", "1.21.5"))
+            latest_version = get_mod_info.get_mod_latest_version(project_id, config["current_version"])
             latest_version_number = get_mod_info.get_mod_version_number(latest_version) or "?"
             return current_version_number, latest_version_number
         async def fetch_and_update(mod: tuple[str, dict]) -> None:
@@ -142,6 +142,7 @@ def check_update(stdscr: Any) -> None:
 
     threading.Thread(target=fetch_all_latest, daemon=True).start()
     pos = 0
+    stdscr.nodelay(True)  # 设置非阻塞
     while True:
         stdscr.clear()
         h, w = stdscr.getmaxyx()
@@ -177,14 +178,21 @@ def check_update(stdscr: Any) -> None:
                 if end_x >= w:
                     end_x = w - 1
                 stdscr.addstr(y, end_x, ")", curses.color_pair(4))
-            stdscr.addstr(h-1, 0, f"共 {len(mod_dict)} 个mod，当前{pos+1}-{pos+len(visible_mods)}，上下键翻页，q返回")
+            # 进度百分比
+            total = len(mod_dict)
+            finished = len(latest_versions)
+            percent = int(finished / total * 100) if total else 100
+            stdscr.addstr(h-1, 0, f"共 {total} 个mod，当前{pos+1}-{pos+len(visible_mods)}，上下键翻页，q返回   进度：{percent}%")
         stdscr.refresh()
         key = stdscr.getch()
-        if key in (ord('q'), ord('Q')):
-            break
-        elif key == curses.KEY_UP:
-            if pos > 0:
-                pos -= 1
-        elif key == curses.KEY_DOWN:
-            if pos + max_lines < len(mod_dict):
-                pos += 1
+        if key != -1:
+            if key in (ord('q'), ord('Q')):
+                break
+            elif key == curses.KEY_UP:
+                if pos > 0:
+                    pos -= 1
+            elif key == curses.KEY_DOWN:
+                if pos + max_lines < len(mod_dict):
+                    pos += 1
+        time.sleep(0.05)  # 防止CPU占用过高
+    stdscr.nodelay(False)  # 恢复阻塞模式
