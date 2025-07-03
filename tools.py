@@ -1,23 +1,22 @@
 import logging
 import os
 import tomllib
-from unittest import result
 import tomli_w  # 用于写入TOML文件
 import get_mod_info
 import read_mod
 import curses
 import unicodedata
 import asyncio
+from typing import Dict, Any, Callable
 
 with open("config.toml", "rb") as f:
-    config = tomllib.load(f)
+    config: dict = tomllib.load(f)
 
-def exit_gui():
-    """Exit the program."""
+def exit_gui() -> None:
     raise SystemExit
 
-def get_mod_dict(mod_folder):
-    mod_dict={}
+def get_mod_dict(mod_folder: str) -> Dict[str, dict]:
+    mod_dict: Dict[str, dict] = {}
     for mod_file in os.listdir(mod_folder):
         if mod_file.endswith(".jar"):
             try:
@@ -31,19 +30,16 @@ def get_mod_dict(mod_folder):
                     }
             except Exception as e:
                 print(f"Error reading {mod_file}: {e}")
-
     return mod_dict
 
-def get_display_length(s):
-    """返回字符串的显示宽度，兼容中英文。"""
+def get_display_length(s: str) -> int:
     return sum(2 if unicodedata.east_asian_width(c) in ('F', 'W') else 1 for c in s)
 
-def display_mod_list(stdscr):
-    """Display the list of mods in the specified folder, support scroll and q to quit."""
+def display_mod_list(stdscr: Any) -> None:
     mod_dict = get_mod_dict(config.get("modFolder", "./mods"))
-    mod_list=list(mod_dict.items())
-    from tools import get_display_length  # 避免循环引用
-    pos = 0  # 当前滚动起始位置
+    mod_list = list(mod_dict.items())
+    from tools import get_display_length
+    pos = 0
     while True:
         stdscr.clear()
         h, w = stdscr.getmaxyx()
@@ -52,11 +48,10 @@ def display_mod_list(stdscr):
             stdscr.addstr(1, 0, "按q返回主菜单...")
         else:
             stdscr.addstr(0, 0, "Mod列表(上下键翻页，q返回):")
-            max_lines = h - 2  # 第一行为标题，最后一行为提示
+            max_lines = h - 2
             visible_mods = mod_list[pos:pos+max_lines]
             for idx, mod in enumerate(visible_mods):
-                display_str = f"{pos + idx + 1}. {mod[0]} ({mod[1]["version"]})"
-                # 按显示宽度截断，兼容中英文
+                display_str = f"{pos + idx + 1}. {mod[0]} ({mod[1]['version']})"
                 cut_str = ''
                 width = 0
                 for c in display_str:
@@ -77,9 +72,8 @@ def display_mod_list(stdscr):
         elif key == curses.KEY_DOWN:
             if pos + max_lines < len(mod_list):
                 pos += 1
-    
-def set_update_source(platform,stdscr):
-    """设置更新来源"""
+
+def set_update_source(platform: str, stdscr: Any) -> None:
     config["update_from"] = platform
     with open("config.toml", "wb") as f:
         tomli_w.dump(config, f)
@@ -87,7 +81,7 @@ def set_update_source(platform,stdscr):
     stdscr.refresh()
     stdscr.getch()
 
-def set_mod_directory(stdscr, prompt="请输入mods目录路径"):
+def set_mod_directory(stdscr: Any, prompt: str = "请输入mods目录路径") -> str:
     while True:
         curses.echo()
         stdscr.clear()
@@ -96,7 +90,7 @@ def set_mod_directory(stdscr, prompt="请输入mods目录路径"):
         prompt_full = f"{prompt} (当前: {default_path}，直接回车使用)"
         stdscr.addstr(h // 2 - 1, w // 2 - len(prompt_full) // 2, prompt_full)
         stdscr.refresh()
-        stdscr.move(h // 2, w // 2 - 20)  # 设置光标到输入框起始位置
+        stdscr.move(h // 2, w // 2 - 20)
         path = stdscr.getstr(h // 2, w // 2 - 20, 40).decode('utf-8').strip()
         curses.noecho()
         if not path:
@@ -119,37 +113,34 @@ import threading
 import time
 import curses
 
-def check_update(stdscr):
-    """显示mod列表并异步检查更新，支持彩色显示版本状态"""
+def check_update(stdscr: Any) -> None:
     mod_dict = get_mod_dict(config.get("modFolder", "./mods"))
-    latest_versions = {}  # {mod_name: latest_version}
+    latest_versions: Dict[str, Any] = {}
     update_done = threading.Event()
 
-    def fetch_all_latest():
-        def get_mod_by_mod_file(mod_folder,mod_file):
-            current_version= get_mod_info.get_mod_current_version(mod_folder,mod_file)
-            current_version_number = get_mod_info.get_mod_version_number(current_version)
+    def fetch_all_latest() -> None:
+        def get_mod_by_mod_file(mod_folder: str, mod_file: str) -> tuple[str, str]:
+            current_version = get_mod_info.get_mod_current_version(mod_folder, mod_file)
+            current_version_number = get_mod_info.get_mod_version_number(current_version) or "?"
             project_id = get_mod_info.get_mod_project_id(current_version)
-            latest_version= get_mod_info.get_mod_latest_version(project_id, config.get("current_version", "1.21.5"))
-            latest_version_number = get_mod_info.get_mod_version_number(latest_version)
+            if not project_id:return current_version_number, "?"
+            latest_version = get_mod_info.get_mod_latest_version(project_id, config.get("current_version", "1.21.5"))
+            latest_version_number = get_mod_info.get_mod_version_number(latest_version) or "?"
             return current_version_number, latest_version_number
-            
-        async def fetch_and_update(mod):
+        async def fetch_and_update(mod: tuple[str, dict]) -> None:
             try:
-                current_ver,latest_ver = await asyncio.to_thread(get_mod_by_mod_file, mod_folder=config["modFolder"], mod_file=mod[1]["file"])
+                current_ver, latest_ver = await asyncio.to_thread(get_mod_by_mod_file, mod_folder=config["modFolder"], mod_file=mod[1]["file"])
                 mod_dict[mod[0]]["current_version"] = current_ver
                 latest_versions[mod[0]] = latest_ver
-            except Exception as e:  
+            except Exception:
                 latest_versions[mod[0]] = None
-        async def main_async():
+        async def main_async() -> None:
             tasks = [fetch_and_update(mod) for mod in mod_dict.items()]
             await asyncio.gather(*tasks)
             update_done.set()
         asyncio.run(main_async())
 
-    # 启动网络请求线程
     threading.Thread(target=fetch_all_latest, daemon=True).start()
-
     pos = 0
     while True:
         stdscr.clear()
@@ -180,7 +171,6 @@ def check_update(stdscr):
                     stdscr.addstr(y, x, current_ver, curses.color_pair(3))
                     x += len(current_ver)
                     stdscr.addstr(y, x, f" → {latest_ver}", curses.color_pair(2))
-                # 修复括号位置和越界
                 end_x = x
                 if latest_ver and current_ver != latest_ver:
                     end_x += len(f" → {latest_ver}")
