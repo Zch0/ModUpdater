@@ -9,6 +9,14 @@ import unicodedata
 import asyncio
 from typing import Dict, Any, Callable
 
+logging.basicConfig(
+    filename='modupdater.log',
+    filemode='w',  # 每次运行时覆盖日志文件
+    level=logging.ERROR,
+    format='%(asctime)s %(levelname)s %(message)s',
+    encoding='utf-8'
+)
+
 with open("config.toml", "rb") as f:
     config: dict = tomllib.load(f)
 
@@ -30,6 +38,7 @@ def get_mod_dict(mod_folder: str) -> Dict[str, dict]:
                     }
             except Exception as e:
                 print(f"Error reading {mod_file}: {e}")
+                logging.error(f"Error reading {mod_file}: {e}", exc_info=True)
     return mod_dict
 
 def get_display_length(s: str) -> int:
@@ -128,12 +137,25 @@ def check_update(stdscr: Any) -> None:
             latest_version_number = get_mod_info.get_mod_version_number(latest_version) or "?"
             return current_version_number, latest_version_number
         async def fetch_and_update(mod: tuple[str, dict]) -> None:
-            try:
-                current_ver, latest_ver = await asyncio.to_thread(get_mod_by_mod_file, mod_folder=config["modFolder"], mod_file=mod[1]["file"])
-                mod_dict[mod[0]]["current_version"] = current_ver
-                latest_versions[mod[0]] = latest_ver
-            except Exception:
-                latest_versions[mod[0]] = None
+            max_retries = 5
+            retries = 0
+            while True:
+                try:
+                    current_ver, latest_ver = await asyncio.to_thread(get_mod_by_mod_file, mod_folder=config["modFolder"], mod_file=mod[1]["file"])
+                    mod_dict[mod[0]]["current_version"] = current_ver
+                    latest_versions[mod[0]] = latest_ver
+                    break  # 成功则退出循环
+                except Exception as e:
+                    if e.__class__.__name__ == "NotFoundException":
+                        latest_versions[mod[0]] = None
+                        logging.error(f"Mod {mod[0]} not found on Modrinth.")
+                        break  # 直接跳过
+                    else:
+                        retries += 1
+                        logging.error(f"Error fetching update for {mod[0]} (retry {retries}): {e}")
+                        if retries >= max_retries:
+                            break  # 达到最大重试次数才算失败
+                        await asyncio.sleep(1)  # 等待后重试
         async def main_async() -> None:
             tasks = [fetch_and_update(mod) for mod in mod_dict.items()]
             await asyncio.gather(*tasks)

@@ -13,7 +13,9 @@ MENU_ITEMS: List[Dict[str, Any]] = [
             {"name": "更新来源", "submenu": [
                 {"name": "Modrinth", "action": "set_update_source_modrinth"},
                 {"name": "Github", "action": "set_update_source_github"},
+                {"name": "返回", "action": "back"}
             ]},
+            {"name": "返回", "action": "back"}
         ]
     },
     {"name": "退出", "action": "exit_gui"}
@@ -22,10 +24,11 @@ ACTIONS: Dict[str, Callable[..., Any]] = {
     "start_update": lambda: print("开始更新..."),
     "check_update": lambda stdscr: check_update(stdscr),
     "display_mod_list": lambda stdscr: display_mod_list(stdscr),
-    "set_mod_directory": lambda stdscr: set_mod_directory(stdscr),
-    "set_update_source_modrinth": lambda stdscr: set_update_source("Modrinth", stdscr),
-    "set_update_source_github": lambda stdscr: set_update_source("Github", stdscr),
-    "exit_gui": lambda stdscr: exit_gui()
+    "set_mod_directory": lambda stdscr: (set_mod_directory(stdscr), navigate_menu(stdscr, MENU_ITEMS[3]["submenu"])),
+    "set_update_source_modrinth": lambda stdscr: (set_update_source("Modrinth", stdscr), navigate_menu(stdscr, MENU_ITEMS[3]["submenu"][1]["submenu"])),
+    "set_update_source_github": lambda stdscr: (set_update_source("Github", stdscr), navigate_menu(stdscr, MENU_ITEMS[3]["submenu"][1]["submenu"])),
+    "exit_gui": lambda stdscr: exit_gui(),
+    "back": lambda stdscr: None
 }
 
 
@@ -59,6 +62,8 @@ def navigate_menu(stdscr: Any, menu: List[Dict[str, Any]], parent: Optional[List
             current_row = min(len(menu) - 1, current_row + 1)
         elif key == ord('\n'):
             selected_item = menu[current_row]
+            if selected_item.get("action") == "back":
+                return  # 返回上一级菜单
             if "submenu" in selected_item:
                 navigate_menu(stdscr, selected_item["submenu"], parent=menu)
             else:
