@@ -3,7 +3,6 @@ from typing import Any, Callable, List, Dict, Optional
 from tools import check_update, display_mod_list, exit_gui, get_display_length, set_mod_directory, set_update_source
 
 MENU_ITEMS: List[Dict[str, Any]] = [
-    {"name": "开始更新", "action": "start_update"},
     {"name": "检查更新", "action": "check_update"},
     {"name": "查看mod列表", "action": "display_mod_list"},
     {
@@ -24,7 +23,7 @@ ACTIONS: Dict[str, Callable[..., Any]] = {
     "start_update": lambda: print("开始更新..."),
     "check_update": lambda stdscr: check_update(stdscr),
     "display_mod_list": lambda stdscr: display_mod_list(stdscr),
-    "set_mod_directory": lambda stdscr: (set_mod_directory(stdscr), navigate_menu(stdscr, MENU_ITEMS[3]["submenu"])),
+    "set_mod_directory": lambda stdscr: (set_mod_directory(stdscr), navigate_menu(stdscr, MENU_ITEMS[2]["submenu"])),
     "set_update_source_modrinth": lambda stdscr: (set_update_source("Modrinth", stdscr), navigate_menu(stdscr, MENU_ITEMS[3]["submenu"][1]["submenu"])),
     "set_update_source_github": lambda stdscr: (set_update_source("Github", stdscr), navigate_menu(stdscr, MENU_ITEMS[3]["submenu"][1]["submenu"])),
     "exit_gui": lambda stdscr: exit_gui(),
@@ -86,6 +85,7 @@ def main_loop(stdscr: Any) -> None:
         curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
         curses.init_pair(3, curses.COLOR_RED, curses.COLOR_BLACK)
         curses.init_pair(4, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        curses.init_pair(5, curses.COLOR_YELLOW, curses.COLOR_BLACK)
     while True:
         stdscr.clear()
         navigate_menu(stdscr, MENU_ITEMS)

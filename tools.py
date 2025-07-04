@@ -124,7 +124,7 @@ import curses
 
 def check_update(stdscr: Any) -> None:
     mod_dict = get_mod_dict(config.get("modFolder", "./mods"))
-    latest_versions: Dict[str, Any] = {}
+    # latest_versions: Dict[str, Any] = {}
     update_done = threading.Event()
 
     def fetch_all_latest() -> None:
@@ -137,17 +137,18 @@ def check_update(stdscr: Any) -> None:
             latest_version_number = get_mod_info.get_mod_version_number(latest_version) or "?"
             return current_version_number, latest_version_number
         async def fetch_and_update(mod: tuple[str, dict]) -> None:
-            max_retries = 5
+            max_retries = config.get("maxRetries", 3)  # 从配置中获取最大重试次数
             retries = 0
             while True:
                 try:
-                    current_ver, latest_ver = await asyncio.to_thread(get_mod_by_mod_file, mod_folder=config["modFolder"], mod_file=mod[1]["file"])
-                    mod_dict[mod[0]]["current_version"] = current_ver
-                    latest_versions[mod[0]] = latest_ver
+                    current_version, latest_version = await asyncio.to_thread(get_mod_by_mod_file, mod_folder=config["modFolder"], mod_file=mod[1]["file"])
+                    mod_dict[mod[0]]["current_version"] = current_version
+                    mod_dict[mod[0]]["latest_version"] = latest_version
+                    # latest_versions[mod[0]] = latest_version
                     break  # 成功则退出循环
                 except Exception as e:
                     if e.__class__.__name__ == "NotFoundException":
-                        latest_versions[mod[0]] = None
+                        mod_dict[mod[0]]["latest_version"] = "Not Found"
                         logging.error(f"Mod {mod[0]} not found on Modrinth.")
                         break  # 直接跳过
                     else:
@@ -179,7 +180,7 @@ def check_update(stdscr: Any) -> None:
                 name = mod[0]
                 local_ver = mod[1]["version"]
                 current_ver = mod[1].get("current_version", local_ver)
-                latest_ver = latest_versions.get(name)
+                latest_ver = mod[1].get("latest_version", None)
                 y = idx + 1
                 display_str = f"{pos + idx + 1}. {name} ("
                 stdscr.addstr(y, 0, display_str)
@@ -193,7 +194,7 @@ def check_update(stdscr: Any) -> None:
                 else:
                     stdscr.addstr(y, x, current_ver, curses.color_pair(3))
                     x += len(current_ver)
-                    stdscr.addstr(y, x, f" → {latest_ver}", curses.color_pair(2))
+                    stdscr.addstr(y, x, f" → {latest_ver}", curses.color_pair(2 if latest_ver != "Not Found" else 5))
                 end_x = x
                 if latest_ver and current_ver != latest_ver:
                     end_x += len(f" → {latest_ver}")
@@ -202,7 +203,7 @@ def check_update(stdscr: Any) -> None:
                 stdscr.addstr(y, end_x, ")", curses.color_pair(4))
             # 进度百分比
             total = len(mod_dict)
-            finished = len(latest_versions)
+            finished = len([mod for mod in mod_dict.values() if mod.get("latest_version") is not None])
             percent = int(finished / total * 100) if total else 100
             stdscr.addstr(h-1, 0, f"共 {total} 个mod，当前{pos+1}-{pos+len(visible_mods)}，上下键翻页，q返回   进度：{percent}%")
         stdscr.refresh()
@@ -216,5 +217,128 @@ def check_update(stdscr: Any) -> None:
             elif key == curses.KEY_DOWN:
                 if pos + max_lines < len(mod_dict):
                     pos += 1
-        time.sleep(0.05)  # 防止CPU占用过高
+            elif key == ord('\n'):
+                stdscr.nodelay(False)  # 恢复阻塞模式
+                start_update(stdscr, mod_dict)
+        time.sleep(0.01)  # 防止CPU占用过高
     stdscr.nodelay(False)  # 恢复阻塞模式
+
+def start_update(stdscr, mod_dict) -> None:
+    # 只显示有可用更新的mod
+    update_mods = [
+        (name, mod_dict[name], mod_dict[name].get("latest_version", None))
+        for name in mod_dict
+        if mod_dict[name].get("latest_version") and mod_dict[name].get("current_version") != mod_dict[name].get("latest_version") and mod_dict[name].get("latest_version") != "Not Found"
+    ]
+    if not update_mods:
+        stdscr.clear()
+        stdscr.addstr(0, 0, "没有可用更新的mod。按任意键返回...")
+        stdscr.refresh()
+        stdscr.getch()
+        return
+    pos = 0  # 当前页面起始下标
+    checked = set()  # 选中的mod下标
+    cursor = 0  # 当前页面内高亮光标位置
+    while True:
+        stdscr.clear()
+        h, w = stdscr.getmaxyx()
+        max_lines = h - 2
+        total = len(update_mods)
+        # 保证cursor在当前页
+        if cursor < 0:
+            cursor = 0
+        if cursor >= min(max_lines, total-pos):
+            cursor = min(max_lines-1, total-pos-1)
+        visible_mods = update_mods[pos:pos+max_lines]
+        stdscr.addstr(0, 0, "选择要更新的mod(空格选中/取消，回车开始更新，q返回):")
+        for idx, (name, mod, latest_ver) in enumerate(visible_mods):
+            checked_box = "[*]" if (pos + idx) in checked else "[ ]"
+            prefix = f"{pos + idx + 1}. "
+            left_paren = "("
+            right_paren = ")"
+            name_str = name
+            old_ver = mod['current_version'] or mod['version']
+            arrow = " → "
+            new_ver = f"{latest_ver}"
+            box_str = checked_box
+            # 计算各部分宽度，防止超出
+            width = 0
+            def cut(s):
+                nonlocal width
+                out = ''
+                for c in s:
+                    w_c = get_display_length(c)
+                    if width + w_c > w-1:
+                        break
+                    out += c
+                    width += w_c
+                return out
+            cut_prefix = cut(prefix)
+            cut_name = cut(name_str)
+            cut_left = cut(left_paren)
+            cut_old = cut(old_ver)
+            cut_arrow = cut(arrow)
+            cut_new = cut(new_ver)
+            cut_right = cut(right_paren)
+            cut_box = cut(' ' + box_str)
+            y = idx + 1
+            x = 0
+            # 高亮行
+            if idx == cursor:
+                stdscr.addstr(y, x, cut_prefix + cut_name + cut_left + cut_old + cut_arrow + cut_new + cut_right + cut_box, curses.A_REVERSE)
+                continue
+            # 普通行
+            stdscr.addstr(y, x, cut_prefix)
+            x += get_display_length(cut_prefix)
+            # 选中mod名为黄色
+            if (pos + idx) in checked:
+                stdscr.addstr(y, x, cut_name, curses.color_pair(5))
+            else:
+                stdscr.addstr(y, x, cut_name)
+            x += get_display_length(cut_name)
+            # 左括号白色
+            stdscr.addstr(y, x, cut_left, curses.color_pair(4))
+            x += get_display_length(cut_left)
+            # 旧版本红色
+            stdscr.addstr(y, x, cut_old, curses.color_pair(3))
+            x += get_display_length(cut_old)
+            # 箭头
+            stdscr.addstr(y, x, cut_arrow)
+            x += get_display_length(cut_arrow)
+            # 新版本绿色
+            stdscr.addstr(y, x, cut_new, curses.color_pair(2))
+            x += get_display_length(cut_new)
+            # 右括号白色
+            stdscr.addstr(y, x, cut_right, curses.color_pair(4))
+            x += get_display_length(cut_right)
+            # 复选框
+            stdscr.addstr(y, x, cut_box)
+        stdscr.addstr(h-1, 0, f"共 {len(update_mods)} 个可更新mod，当前{pos+1}-{pos+len(visible_mods)}，上下键移动，空格选中，回车更新，q返回")
+        stdscr.refresh()
+        key = stdscr.getch()
+        if key in (ord('q'), ord('Q')):
+            break
+        elif key == curses.KEY_UP:
+            if cursor > 0:
+                cursor -= 1
+            elif pos > 0:
+                pos -= 1
+        elif key == curses.KEY_DOWN:
+            if cursor < len(visible_mods) - 1:
+                cursor += 1
+            elif pos + max_lines < total:
+                pos += 1
+        elif key == ord(' '):
+            highlight_idx = pos + cursor
+            if highlight_idx < total:
+                if highlight_idx in checked:
+                    checked.remove(highlight_idx)
+                else:
+                    checked.add(highlight_idx)
+        elif key == ord('\n'):
+            selected_mods = [update_mods[i] for i in checked if i < len(update_mods)]
+            stdscr.clear()
+            stdscr.addstr(0, 0, f"即将更新 {len(selected_mods)} 个mod，按任意键返回...")
+            stdscr.refresh()
+            stdscr.getch()
+            break
