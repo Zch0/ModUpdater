@@ -33,8 +33,8 @@ def get_mod_dict(mod_folder: str) -> Dict[str, dict]:
                 mod_version = read_mod.extract_mod_version(mod_config)
                 if mod_name:
                     mod_dict[mod_name] = {
-                        "version": mod_version,
-                        "file": mod_file
+                        "local_version_number": mod_version,
+                        "local_file": mod_file
                     }
             except Exception as e:
                 print(f"Error reading {mod_file}: {e}")
@@ -60,7 +60,7 @@ def display_mod_list(stdscr: Any) -> None:
             max_lines = h - 2
             visible_mods = mod_list[pos:pos+max_lines]
             for idx, mod in enumerate(visible_mods):
-                display_str = f"{pos + idx + 1}. {mod[0]} ({mod[1]['version']})"
+                display_str = f"{pos + idx + 1}. {mod[0]} ({mod[1]['local_version_number']})"
                 cut_str = ''
                 width = 0
                 for c in display_str:
@@ -120,35 +120,32 @@ def set_mod_directory(stdscr: Any, prompt: str = "请输入mods目录路径") ->
 
 import threading
 import time
-import curses
 
 def check_update(stdscr: Any) -> None:
     mod_dict = get_mod_dict(config.get("modFolder", "./mods"))
-    # latest_versions: Dict[str, Any] = {}
     update_done = threading.Event()
 
     def fetch_all_latest() -> None:
         def get_mod_by_mod_file(mod_folder: str, mod_file: str) -> tuple[str, str]:
             current_version = get_mod_info.get_mod_current_version(mod_folder, mod_file)
-            current_version_number = get_mod_info.get_mod_version_number(current_version) or "?"
             project_id = get_mod_info.get_mod_project_id(current_version)
-            if not project_id:return current_version_number, "?"
             latest_version = get_mod_info.get_mod_latest_version(project_id, config["current_version"])
-            latest_version_number = get_mod_info.get_mod_version_number(latest_version) or "?"
-            return current_version_number, latest_version_number
+            return current_version, latest_version
         async def fetch_and_update(mod: tuple[str, dict]) -> None:
             max_retries = config.get("maxRetries", 3)  # 从配置中获取最大重试次数
             retries = 0
             while True:
                 try:
-                    current_version, latest_version = await asyncio.to_thread(get_mod_by_mod_file, mod_folder=config["modFolder"], mod_file=mod[1]["file"])
+                    current_version, latest_version = await asyncio.to_thread(get_mod_by_mod_file, mod_folder=config["modFolder"], mod_file=mod[1]["local_file"])
                     mod_dict[mod[0]]["current_version"] = current_version
                     mod_dict[mod[0]]["latest_version"] = latest_version
+                    mod_dict[mod[0]]["current_version_number"] = get_mod_info.get_mod_version_number(current_version)
+                    mod_dict[mod[0]]["latest_version_number"] = get_mod_info.get_mod_version_number(latest_version)
                     # latest_versions[mod[0]] = latest_version
                     break  # 成功则退出循环
                 except Exception as e:
                     if e.__class__.__name__ == "NotFoundException":
-                        mod_dict[mod[0]]["latest_version"] = "Not Found"
+                        mod_dict[mod[0]]["latest_version_number"] = "Not Found"
                         logging.error(f"Mod {mod[0]} not found on Modrinth.")
                         break  # 直接跳过
                     else:
@@ -178,32 +175,32 @@ def check_update(stdscr: Any) -> None:
             visible_mods = list(mod_dict.items())[pos:pos+max_lines]
             for idx, mod in enumerate(visible_mods):
                 name = mod[0]
-                local_ver = mod[1]["version"]
-                current_ver = mod[1].get("current_version", local_ver)
-                latest_ver = mod[1].get("latest_version", None)
+                local_version_number = mod[1]["local_version_number"]
+                current_version_number = mod[1].get("current_version_number", local_version_number)
+                latest_version_number = mod[1].get("latest_version_number", None)
                 y = idx + 1
                 display_str = f"{pos + idx + 1}. {name} ("
                 stdscr.addstr(y, 0, display_str)
                 x = len(display_str)
-                if latest_ver is None:
-                    stdscr.addstr(y, x, current_ver, curses.color_pair(4))
-                    x += len(current_ver)
-                elif current_ver == latest_ver:
-                    stdscr.addstr(y, x, current_ver, curses.color_pair(2))
-                    x += len(current_ver)
+                if latest_version_number is None:
+                    stdscr.addstr(y, x, current_version_number, curses.color_pair(4))
+                    x += len(current_version_number)
+                elif current_version_number == latest_version_number:
+                    stdscr.addstr(y, x, current_version_number, curses.color_pair(2))
+                    x += len(current_version_number)
                 else:
-                    stdscr.addstr(y, x, current_ver, curses.color_pair(3))
-                    x += len(current_ver)
-                    stdscr.addstr(y, x, f" → {latest_ver}", curses.color_pair(2 if latest_ver != "Not Found" else 5))
+                    stdscr.addstr(y, x, current_version_number, curses.color_pair(3))
+                    x += len(current_version_number)
+                    stdscr.addstr(y, x, f" → {latest_version_number}", curses.color_pair(2 if latest_version_number != "Not Found" else 5))
                 end_x = x
-                if latest_ver and current_ver != latest_ver:
-                    end_x += len(f" → {latest_ver}")
+                if latest_version_number and current_version_number != latest_version_number:
+                    end_x += len(f" → {latest_version_number}")
                 if end_x >= w:
                     end_x = w - 1
                 stdscr.addstr(y, end_x, ")", curses.color_pair(4))
             # 进度百分比
             total = len(mod_dict)
-            finished = len([mod for mod in mod_dict.values() if mod.get("latest_version") is not None])
+            finished = len([mod for mod in mod_dict.values() if mod.get("latest_version_number") is not None])
             percent = int(finished / total * 100) if total else 100
             stdscr.addstr(h-1, 0, f"共 {total} 个mod，当前{pos+1}-{pos+len(visible_mods)}，上下键翻页，q返回   进度：{percent}%")
         stdscr.refresh()
@@ -219,16 +216,16 @@ def check_update(stdscr: Any) -> None:
                     pos += 1
             elif key == ord('\n'):
                 stdscr.nodelay(False)  # 恢复阻塞模式
-                start_update(stdscr, mod_dict)
+                choose_update_mods(stdscr, mod_dict)
         time.sleep(0.01)  # 防止CPU占用过高
     stdscr.nodelay(False)  # 恢复阻塞模式
 
-def start_update(stdscr, mod_dict) -> None:
+def choose_update_mods(stdscr, mod_dict) -> None:
     # 只显示有可用更新的mod
     update_mods = [
-        (name, mod_dict[name], mod_dict[name].get("latest_version", None))
+        (name, mod_dict[name], mod_dict[name].get("latest_version_number", None))
         for name in mod_dict
-        if mod_dict[name].get("latest_version") and mod_dict[name].get("current_version") != mod_dict[name].get("latest_version") and mod_dict[name].get("latest_version") != "Not Found"
+        if mod_dict[name].get("latest_version_number") and mod_dict[name].get("current_version_number") != mod_dict[name].get("latest_version_number") and mod_dict[name].get("latest_version_number") != "Not Found"
     ]
     if not update_mods:
         stdscr.clear()
@@ -257,7 +254,7 @@ def start_update(stdscr, mod_dict) -> None:
             left_paren = "("
             right_paren = ")"
             name_str = name
-            old_ver = mod['current_version'] or mod['version']
+            old_ver = mod['current_version_number'] or mod['version_number']
             arrow = " → "
             new_ver = f"{latest_ver}"
             box_str = checked_box
