@@ -1,4 +1,5 @@
 modFolder = "./test/mods"
+cacheFolder = "./test/cache"
 sourceURL_from = [
     "sources",
 ]
