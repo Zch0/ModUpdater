@@ -15,7 +15,7 @@ from typing import Dict, Any, Callable
 logging.basicConfig(
     filename='modupdater.log',
     filemode='w',  # 每次运行时覆盖日志文件
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s %(levelname)s %(message)s',
     encoding='utf-8'
 )
@@ -143,8 +143,8 @@ def check_update(stdscr: Any) -> None:
                     mod_dict[mod[0]]["current_version"] = current_version
                     mod_dict[mod[0]]["latest_version"] = latest_version
                     mod_dict[mod[0]]["current_version_number"] = get_mod_info.get_mod_version_number(current_version)
-                    mod_dict[mod[0]]["latest_version_number"] = get_mod_info.get_mod_version_number(latest_version)
-                    logging.debug(f"Fetched update for {mod[0]}: {current_version} → {latest_version}")
+                    mod_dict[mod[0]]["latest_version_number"] = get_mod_info.get_mod_version_number(latest_version) or "No compatible version"
+                    logging.info(f"Fetched update for {mod[0]}: {current_version} → {latest_version}")
                     break  # 成功则退出循环
                 except Exception as e:
                     if e.__class__.__name__ == "NotFoundException":
@@ -228,7 +228,7 @@ def check_update(stdscr: Any) -> None:
                     stdscr.addstr(y, x, cut_arrow)
                     x += get_display_length(cut_arrow)
                 if cut_new:
-                    stdscr.addstr(y, x, cut_new, curses.color_pair(2 if latest_version_number != "Not Found" else 5))
+                    stdscr.addstr(y, x, cut_new, curses.color_pair(2 if latest_version_number != "Not Found" and latest_version_number != "No compatible version" else 5))
                     x += get_display_length(cut_new)
                 stdscr.addstr(y, x, cut_right, curses.color_pair(4))
             # 进度百分比
@@ -250,6 +250,7 @@ def check_update(stdscr: Any) -> None:
             elif key == ord('\n'):
                 stdscr.nodelay(False)  # 恢复阻塞模式
                 choose_update_mods(stdscr, mod_dict)
+                return  # 直接返回根菜单
         time.sleep(0.01)  # 防止CPU占用过高
     stdscr.nodelay(False)  # 恢复阻塞模式
 
@@ -258,7 +259,7 @@ def choose_update_mods(stdscr, mod_dict) -> None:
     update_mods = [
         (name, mod_dict[name])
         for name in mod_dict
-        if mod_dict[name].get("latest_version_number") and mod_dict[name].get("current_version_number") != mod_dict[name].get("latest_version_number") and mod_dict[name].get("latest_version_number") != "Not Found"
+        if mod_dict[name].get("latest_version_number") and mod_dict[name].get("current_version_number") != mod_dict[name].get("latest_version_number") and mod_dict[name].get("latest_version_number") != "Not Found" and mod_dict[name].get("latest_version_number") != "No compatible version"
     ]
     if not update_mods:
         stdscr.clear()
@@ -406,32 +407,68 @@ def choose_update_mods(stdscr, mod_dict) -> None:
                         pos2 += 1
                 elif key2 == ord('\n'):
                     start_update_mods(stdscr, selected_mods)
-            continue  # 返回选择界面
+                    return  # 直接返回主菜单
 
 def start_update_mods(stdscr: Any, selected_mods: list) -> None:
-    for mod_name,mod_info in selected_mods:
+    for mod_name, mod_info in selected_mods:
         stdscr.clear()
         mod_local_name = mod_info["local_filename"]
         mod_latest_version = mod_info["latest_version"]
         stdscr.addstr(0, 0, f"正在更新mod {mod_name} ({mod_local_name}) 到版本 {mod_latest_version.version_number}...")
         stdscr.refresh()
         logging.info(f"Updating mod {mod_name} ({mod_local_name}) to version {mod_latest_version.version_number}")
-        update_mod(mod_version=mod_latest_version, mod_local_name=mod_local_name)
+        update_mod(mod_latest_version, mod_local_name,stdscr=stdscr)
+    # 下载全部完成后提示
+    stdscr.clear()
+    stdscr.addstr(0, 0, "已更新完毕，按任意键继续")
+    stdscr.refresh()
+    stdscr.getch()
+    # 返回主菜单（直接 return 即可，主流程会回到主菜单）
 
-def download_mod(mod_folder,cache_folder,mod_version):
-    mod_folder=Path(mod_folder)
+def update_mod(mod_version: Any, mod_local_name: str, stdscr: Any=None) -> None:
+    mod_folder = config.get("modFolder", "./mods")
+    cache_folder = config.get("cacheFolder", "./cache")
+    download_mod(mod_folder, cache_folder, mod_version, stdscr=stdscr)
+    backup_old_mod(mod_folder, mod_local_name)
+
+def download_mod(mod_folder, cache_folder, mod_version, stdscr=None, progress_line=1):
+    mod_folder = Path(mod_folder)
     cache_folder = Path(cache_folder)
-    mod_file=mod_version.files[0]
-    file_sha1=mod_file.hashes.sha1
-    file_url=mod_file.url
-    file_name= mod_file.filename
+    mod_file = mod_version.files[0]
+    file_sha1 = mod_file.hashes.sha1
+    file_url = mod_file.url
+    file_name = mod_file.filename
     cache_folder.mkdir(exist_ok=True)
     cache_file_path = cache_folder / file_name
-    
+
+    def show_progress(block_num, block_size, total_size):
+        if total_size <= 0:
+            percent = 0
+        else:
+            percent = min(100, block_num * block_size * 100 // total_size)
+        if stdscr:
+            h, w = stdscr.getmaxyx()
+            bar_len = max(10, w - len(file_name) - 20)
+            filled_len = int(bar_len * percent // 100)
+            bar = '█' * filled_len + '-' * (bar_len - filled_len)
+            progress_str = f"[下载进度] {file_name}: |{bar}| {percent}%"
+            stdscr.addstr(progress_line, 0, progress_str[:w-1])
+            stdscr.clrtoeol()
+            stdscr.refresh()
+        else:
+            from sys import stdout
+            bar_len = 40
+            filled_len = int(bar_len * percent // 100)
+            bar = '█' * filled_len + '-' * (bar_len - filled_len)
+            stdout.write(f'\r[下载进度] {file_name}: |{bar}| {percent}%')
+            stdout.flush()
+            if percent == 100:
+                print()  # 换行
+
     logging.info(f"Downloading {file_name} from {file_url} to {cache_folder}")
-    urllib.request.urlretrieve(file_url, cache_file_path)
+    urllib.request.urlretrieve(file_url, cache_file_path, reporthook=show_progress)
     logging.info(f"Downloaded {file_name} to {cache_folder}")
-    downloaded_file_hash=get_mod_info.get_file_sha1(cache_file_path)
+    downloaded_file_hash = get_mod_info.get_file_sha1(cache_file_path)
     if downloaded_file_hash != file_sha1:
         logging.error(f"Hash mismatch for {file_name}: {downloaded_file_hash} != {file_sha1}")
         return False
@@ -456,8 +493,3 @@ def backup_old_mod(mod_folder: str, mod_file: str) -> None:
     os.rename(mod_path, backup_path)
     logging.info(f"Backed up {mod_file} to {backup_path}.")
 
-def update_mod(mod_version: Any,mod_local_name) -> None:
-    mod_folder = config.get("modFolder", "./mods")
-    cache_folder = config.get("cacheFolder", "./cache")
-    backup_old_mod(mod_folder, mod_local_name)
-    download_mod(mod_folder, cache_folder, mod_version)
