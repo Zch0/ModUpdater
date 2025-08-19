@@ -1,4 +1,5 @@
-test/
+tests/mods
+tests/cache
 .venv/
 .vscode/
 __pycache__/

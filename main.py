@@ -1,6 +1,7 @@
 import os
 from pydoc import cli
 import tomllib
+from turtle import update
 from unittest import loader
 import download_from_github
 import read_mod
@@ -10,8 +11,8 @@ with open("config.toml", "rb") as f:
 mod_folder = config.get("modFolder", "./mods")
 sourceURL_from = config.get("sourceURL_from", ["sources"])
 update_from = config.get("update_from", "modrinth")
-target_game_version = config.get("target_game_version","1.21.5")
-
+update_game_version_from = config.get("updateGameVersionFrom")
+update_game_version_to = config.get("updateGameVersionTo")
 def get_mod_versions(mod_name):
     # 从modrinth获取mod信息
     version_list:list=client.list_project_versions(mod_name)
@@ -71,7 +72,7 @@ if __name__ == "__main__":
                 # 筛选支持指定版本的文件，并列出列表
                 for version_number,version_detail in versions.items():
                     game_versions = version_detail["game_versions"]
-                    if target_game_version not in game_versions:
+                    if update_game_version_to not in game_versions:
                         # print(f"Version {version_number} of {mod_name} does not support {target_game_version}.")
                         continue
                     file_list = version_detail["files"]

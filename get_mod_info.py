@@ -1,6 +1,5 @@
 import os
 import hashlib
-from sys import version
 from typing import Optional, Any, List
 
 def get_file_sha1(filepath: str) -> str:

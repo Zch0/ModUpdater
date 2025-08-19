@@ -1,9 +1,6 @@
-modFolder = "./test/mods"
-cacheFolder = "./test/cache"
-sourceURL_from = [
-    "sources",
-]
-downloadSource = "Github"
+updateGameVersionFrom = "1.21.5"
+updateGameVersionTo = "1.21.8"
+modFolder = "./tests/mods"
+cacheFolder = "./.cache"
 update_from = "Modrinth"
-current_version = "1.21.5"
 maxRetries = 5

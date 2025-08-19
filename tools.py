@@ -4,7 +4,7 @@ from pathlib import Path
 import tomllib
 import urllib.request
 import tomli_w
-import urllib  # 用于写入TOML文件
+import urllib
 import get_mod_info
 import read_mod
 import curses
@@ -22,7 +22,8 @@ logging.basicConfig(
 
 with open("config.toml", "rb") as f:
     config: dict = tomllib.load(f)
-
+# update_game_version_from = config["updateGameVersionFrom"]
+# update_game_version_to = config["updateGameVersionTo"]
 def exit_gui() -> None:
     raise SystemExit
 
@@ -48,7 +49,7 @@ def get_display_length(s: str) -> int:
     return sum(2 if unicodedata.east_asian_width(c) in ('F', 'W') else 1 for c in s)
 
 def display_mod_list(stdscr: Any) -> None:
-    mod_dict = get_mod_dict(config.get("modFolder", "./mods"))
+    mod_dict = get_mod_dict(config["modFolder"])
     mod_list = list(mod_dict.items())
     from tools import get_display_length
     pos = 0
@@ -98,7 +99,7 @@ def set_mod_directory(stdscr: Any, prompt: str = "请输入mods目录路径") ->
         curses.echo()
         stdscr.clear()
         h, w = stdscr.getmaxyx()
-        default_path = config.get("modFolder", "./mods")
+        default_path = config["modFolder"]
         prompt_full = f"{prompt} (当前: {default_path}，直接回车使用)"
         stdscr.addstr(h // 2 - 1, w // 2 - len(prompt_full) // 2, prompt_full)
         stdscr.refresh()
@@ -132,7 +133,7 @@ def check_update(stdscr: Any) -> None:
         def get_mod_by_mod_file(mod_folder: str, mod_file: str) -> tuple[str, str]:
             current_version = get_mod_info.get_mod_current_version(mod_folder, mod_file)
             project_id = get_mod_info.get_mod_project_id(current_version)
-            latest_version = get_mod_info.get_mod_latest_version(project_id, config["current_version"])
+            latest_version = get_mod_info.get_mod_latest_version(project_id, config["updateGameVersionTo"])
             return current_version, latest_version
         async def fetch_and_update(mod: tuple[str, dict]) -> None:
             max_retries = config.get("maxRetries", 3)  # 从配置中获取最大重试次数
@@ -147,13 +148,13 @@ def check_update(stdscr: Any) -> None:
                     logging.info(f"Fetched update for {mod[0]}: {current_version} → {latest_version}")
                     break  # 成功则退出循环
                 except Exception as e:
-                    if e.__class__.__name__ == "NotFoundException":
+                    if e.status_code==404:
                         mod_dict[mod[0]]["latest_version_number"] = "Not Found"
                         logging.error(f"Mod {mod[0]} not found on Modrinth.")
                         break  # 直接跳过
                     else:
                         retries += 1
-                        logging.error(f"Error fetching update for {mod[0]} (retry {retries}): {e}")
+                        logging.error(f"Error fetching update for {mod[0]} (retry {retries}): ", exc_info=True)
                         if retries >= max_retries:
                             break  # 达到最大重试次数才算失败
                         await asyncio.sleep(1)  # 等待后重试
@@ -426,7 +427,7 @@ def start_update_mods(stdscr: Any, selected_mods: list) -> None:
     # 返回主菜单（直接 return 即可，主流程会回到主菜单）
 
 def update_mod(mod_version: Any, mod_local_name: str, stdscr: Any=None) -> None:
-    mod_folder = config.get("modFolder", "./mods")
+    mod_folder = config["modFolder"]
     cache_folder = config.get("cacheFolder", "./cache")
     download_mod(mod_folder, cache_folder, mod_version, stdscr=stdscr)
     backup_old_mod(mod_folder, mod_local_name)
