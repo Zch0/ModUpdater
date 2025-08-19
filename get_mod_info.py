@@ -11,7 +11,7 @@ def get_file_sha1(filepath: str) -> str:
 
 from modrinth_api_wrapper import Client
 
-def get_mod_current_version(mod_folder: str, mod_file: str) -> Optional[Any]:
+def get_mod_current_version(mod_folder: str, mod_file: str) -> Any | None:
     client = Client()
     mod_path = os.path.join(mod_folder, mod_file)
     if not os.path.exists(mod_path):
@@ -23,17 +23,17 @@ def get_mod_current_version(mod_folder: str, mod_file: str) -> Optional[Any]:
         return None
     return version_info
 
-def get_mod_project_id(version_info: Any) -> Optional[str]:
+def get_mod_project_id(version_info: Any) -> str | None:
     if not version_info:
         return None
     return getattr(version_info, "project_id", None)
 
-def get_mod_version_number(version_info: Any) -> Optional[str]:
+def get_mod_version_number(version_info: Any) -> str | None:
     if not version_info:
         return None
     return getattr(version_info, "version_number", None)
 
-def get_mod_versions_by_id(project_id: str) -> List[Any]:
+def get_mod_versions_by_id(project_id: str) -> list[Any]:
     client = Client()
     versions: List[Any] = []
     version_list: List[Any] = client.list_project_versions(project_id)
@@ -44,7 +44,7 @@ def get_mod_versions_by_id(project_id: str) -> List[Any]:
         versions.append(version)
     return versions
 
-def get_mod_latest_version(project_id: str, game_version: str) -> Optional[Any]:
+def get_mod_latest_version(project_id: str, game_version: str) -> Any | None:
     versions = get_mod_versions_by_id(project_id)
     if not versions:
         return None

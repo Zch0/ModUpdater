@@ -2,7 +2,7 @@ import curses
 from typing import Any, Callable, List, Dict, Optional
 from tools import check_update, display_mod_list, exit_gui, get_display_length, set_mod_directory, set_update_source
 
-MENU_ITEMS: List[Dict[str, Any]] = [
+MENU_ITEMS: list[dict[str, Any]] = [
     {"name": "检查更新", "action": "check_update"},
     {"name": "查看mod列表", "action": "display_mod_list"},
     {
@@ -11,7 +11,7 @@ MENU_ITEMS: List[Dict[str, Any]] = [
             {"name": "mod目录", "action": "set_mod_directory"},
             {"name": "更新来源", "submenu": [
                 {"name": "Modrinth", "action": "set_update_source_modrinth"},
-                {"name": "Github", "action": "set_update_source_github"},
+                {"name": "CurseForge", "action": "set_update_source_curseforge"},
                 {"name": "返回", "action": "back"}
             ]},
             {"name": "返回", "action": "back"}
@@ -19,7 +19,8 @@ MENU_ITEMS: List[Dict[str, Any]] = [
     },
     {"name": "退出", "action": "exit_gui"}
 ]
-ACTIONS: Dict[str, Callable[..., Any]] = {
+from typing import cast
+ACTIONS: dict[str, Callable[..., Any]] = {
     "start_update": lambda: print("开始更新..."),
     "check_update": lambda stdscr: check_update(stdscr),
     "display_mod_list": lambda stdscr: display_mod_list(stdscr),
@@ -31,7 +32,7 @@ ACTIONS: Dict[str, Callable[..., Any]] = {
 }
 
 
-def print_menu(stdscr: Any, selected_row_idx: int, menu: List[Dict[str, Any]], offset: int = 0) -> None:
+def print_menu(stdscr: Any, selected_row_idx: int, menu: list[dict[str, Any]], offset: int = 0) -> None:
     stdscr.clear()
     h, w = stdscr.getmaxyx()
 
@@ -49,7 +50,7 @@ def print_menu(stdscr: Any, selected_row_idx: int, menu: List[Dict[str, Any]], o
     stdscr.refresh()
 
 
-def navigate_menu(stdscr: Any, menu: List[Dict[str, Any]], parent: Optional[List[Dict[str, Any]]] = None) -> None:
+def navigate_menu(stdscr: Any, menu: list[dict[str, Any]], parent: list[dict[str, Any]] | None = None) -> None:
     current_row = 0
     while True:
         print_menu(stdscr, current_row, menu)

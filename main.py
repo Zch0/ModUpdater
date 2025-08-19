@@ -8,12 +8,12 @@ import read_mod
 from modrinth_api_wrapper import Client
 with open("config.toml", "rb") as f:
     config = tomllib.load(f)
-mod_folder = config.get("modFolder", "./mods")
-sourceURL_from = config.get("sourceURL_from", ["sources"])
-update_from = config.get("update_from", "modrinth")
-update_game_version_from = config.get("updateGameVersionFrom")
-update_game_version_to = config.get("updateGameVersionTo")
-def get_mod_versions(mod_name):
+mod_folder: str = config.get("modFolder", "./mods")
+sourceURL_from: list[str] = config.get("sourceURL_from", ["sources"])
+update_from: str = config.get("update_from", "modrinth")
+update_game_version_from: str | None = config.get("updateGameVersionFrom")
+update_game_version_to: str | None = config.get("updateGameVersionTo")
+def get_mod_versions(mod_name: str) -> dict | None:
     # 从modrinth获取mod信息
     version_list:list=client.list_project_versions(mod_name)
     if not version_list:

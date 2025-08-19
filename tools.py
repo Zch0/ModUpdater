@@ -1,6 +1,7 @@
 import logging
 import os
 from pathlib import Path
+import shutil
 import tomllib
 import urllib.request
 import tomli_w
@@ -27,7 +28,7 @@ with open("config.toml", "rb") as f:
 def exit_gui() -> None:
     raise SystemExit
 
-def get_mod_dict(mod_folder: str) -> Dict[str, dict]:
+def get_mod_dict(mod_folder: str) -> dict[str, dict]:
     mod_dict: Dict[str, dict] = {}
     for mod_file in os.listdir(mod_folder):
         if mod_file.endswith(".jar"):
@@ -49,7 +50,7 @@ def get_display_length(s: str) -> int:
     return sum(2 if unicodedata.east_asian_width(c) in ('F', 'W') else 1 for c in s)
 
 def display_mod_list(stdscr: Any) -> None:
-    mod_dict = get_mod_dict(config["modFolder"])
+    mod_dict = get_mod_dict(config["modFolderFrom"])
     mod_list = list(mod_dict.items())
     from tools import get_display_length
     pos = 0
@@ -99,7 +100,7 @@ def set_mod_directory(stdscr: Any, prompt: str = "请输入mods目录路径") ->
         curses.echo()
         stdscr.clear()
         h, w = stdscr.getmaxyx()
-        default_path = config["modFolder"]
+        default_path = config["modFolderFrom"]
         prompt_full = f"{prompt} (当前: {default_path}，直接回车使用)"
         stdscr.addstr(h // 2 - 1, w // 2 - len(prompt_full) // 2, prompt_full)
         stdscr.refresh()
@@ -109,7 +110,7 @@ def set_mod_directory(stdscr: Any, prompt: str = "请输入mods目录路径") ->
         if not path:
             path = default_path
         if os.path.isdir(path):
-            config["modFolder"] = path
+            config["modFolderFrom"] = path
             with open("config.toml", "wb") as f:
                 tomli_w.dump(config, f)
             stdscr.addstr(h // 2 + 2, w // 2 - 10, f"已设置: {path}")
@@ -126,7 +127,7 @@ import threading
 import time
 
 def check_update(stdscr: Any) -> None:
-    mod_dict = get_mod_dict(config.get("modFolder", "./mods"))
+    mod_dict = get_mod_dict(config.get("modFolderFrom"))
     update_done = threading.Event()
 
     def fetch_all_latest() -> None:
@@ -140,7 +141,7 @@ def check_update(stdscr: Any) -> None:
             retries = 0
             while True:
                 try:
-                    current_version, latest_version = await asyncio.to_thread(get_mod_by_mod_file, mod_folder=config["modFolder"], mod_file=mod[1]["local_filename"])
+                    current_version, latest_version = await asyncio.to_thread(get_mod_by_mod_file, mod_folder=config["modFolderFrom"], mod_file=mod[1]["local_filename"])
                     mod_dict[mod[0]]["current_version"] = current_version
                     mod_dict[mod[0]]["latest_version"] = latest_version
                     mod_dict[mod[0]]["current_version_number"] = get_mod_info.get_mod_version_number(current_version)
@@ -255,7 +256,7 @@ def check_update(stdscr: Any) -> None:
         time.sleep(0.01)  # 防止CPU占用过高
     stdscr.nodelay(False)  # 恢复阻塞模式
 
-def choose_update_mods(stdscr, mod_dict) -> None:
+def choose_update_mods(stdscr: Any, mod_dict: dict) -> None:
     # 只显示有可用更新的mod
     update_mods = [
         (name, mod_dict[name])
@@ -411,6 +412,14 @@ def choose_update_mods(stdscr, mod_dict) -> None:
                     return  # 直接返回主菜单
 
 def start_update_mods(stdscr: Any, selected_mods: list) -> None:
+    import shutil
+    input_mod_folder = config["modFolderFrom"]
+    output_mod_folder = config["modFolderTo"]
+    update_from = config.get("updateGameVersionFrom")
+    update_to = config.get("updateGameVersionTo")
+
+    # 1. 先处理所有需要下载/更新的mod
+    downloaded_mods = set()
     for mod_name, mod_info in selected_mods:
         stdscr.clear()
         mod_local_name = mod_info["local_filename"]
@@ -418,7 +427,34 @@ def start_update_mods(stdscr: Any, selected_mods: list) -> None:
         stdscr.addstr(0, 0, f"正在更新mod {mod_name} ({mod_local_name}) 到版本 {mod_latest_version.version_number}...")
         stdscr.refresh()
         logging.info(f"Updating mod {mod_name} ({mod_local_name}) to version {mod_latest_version.version_number}")
-        update_mod(mod_latest_version, mod_local_name,stdscr=stdscr)
+        update_mod(mod_latest_version, mod_local_name, stdscr=stdscr)
+        downloaded_mods.add(mod_name)
+
+    # 2. 判断是否跨版本
+    cross_version = (update_from != update_to)
+
+    # 3. 处理newMods目录
+    mod_dict = get_mod_dict(input_mod_folder)
+    if cross_version:
+        # 跨版本：只保留下载的mod
+        # 不做额外操作，update_mod已将下载的mod放入newMods
+        pass
+    else:
+        # 同版本：所有mod都转移到newMods，下载的mod只保留最高版本
+        # 复制所有mod到newMods
+        for mod_name, mod_info in mod_dict.items():
+            src_file = os.path.join(input_mod_folder, mod_info["local_filename"])
+            dst_file = os.path.join(output_mod_folder, mod_info["local_filename"])
+            # 如果该mod被下载更新过，优先保留newMods中下载的最高版本（即update_mod已放入）
+            if mod_name in downloaded_mods:
+                # 跳过，已由update_mod写入最高版本
+                continue
+            try:
+                shutil.copy2(src_file, dst_file)
+                logging.info(f"Copied {mod_info['local_filename']} to newMods.")
+            except Exception as e:
+                logging.error(f"Failed to copy {src_file} to {dst_file}: {e}")
+
     # 下载全部完成后提示
     stdscr.clear()
     stdscr.addstr(0, 0, "已更新完毕，按任意键继续")
@@ -426,13 +462,15 @@ def start_update_mods(stdscr: Any, selected_mods: list) -> None:
     stdscr.getch()
     # 返回主菜单（直接 return 即可，主流程会回到主菜单）
 
-def update_mod(mod_version: Any, mod_local_name: str, stdscr: Any=None) -> None:
-    mod_folder = config["modFolder"]
+def update_mod(mod_version: Any, mod_local_name: str, stdscr: Any = None) -> None:
+    input_mod_folder=config["modFolderFrom"]
+    output_mod_folder = config["modFolderTo"]
+    backup_folder = config["backupFolder"]
     cache_folder = config.get("cacheFolder", "./cache")
-    download_mod(mod_folder, cache_folder, mod_version, stdscr=stdscr)
-    backup_old_mod(mod_folder, mod_local_name)
+    download_mod(output_mod_folder, cache_folder, mod_version, stdscr=stdscr)
+    backup_old_mod(mod_folder=input_mod_folder, backup_folder=backup_folder, mod_file=mod_local_name)
 
-def download_mod(mod_folder, cache_folder, mod_version, stdscr=None, progress_line=1):
+def download_mod(mod_folder: str, cache_folder: str, mod_version: Any, stdscr: Any = None, progress_line: int = 1) -> None:
     mod_folder = Path(mod_folder)
     cache_folder = Path(cache_folder)
     mod_file = mod_version.files[0]
@@ -480,17 +518,17 @@ def download_mod(mod_folder, cache_folder, mod_version, stdscr=None, progress_li
     else:
         logging.warning(f"File {file_name} already exists in {mod_folder}, skipping download.")
 
-def backup_old_mod(mod_folder: str, mod_file: str) -> None:
+def backup_old_mod(mod_folder: str, backup_folder: str, mod_file: str) -> None:
     mod_path = Path(mod_folder) / mod_file
     if not mod_path.exists():
         logging.warning(f"Mod file {mod_file} does not exist in {mod_folder}.")
         return
-    backup_folder = Path(mod_folder) / "backup"
+    backup_folder = Path(backup_folder)
     backup_folder.mkdir(exist_ok=True)
     backup_path = backup_folder / mod_file
     if backup_path.exists():
         logging.warning(f"Backup file {backup_path} already exists, skipping backup.")
         return
-    os.rename(mod_path, backup_path)
+    shutil.copy2(mod_path, backup_path)
     logging.info(f"Backed up {mod_file} to {backup_path}.")
 

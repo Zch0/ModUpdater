@@ -1,6 +1,6 @@
 import requests
 
-def get_releases_from_github(owner,repo):
+def get_releases_from_github(owner: str, repo: str) -> None:
     url = f"https://api.github.com/repos/ {owner}/{repo}/releases"
 
     headers = {

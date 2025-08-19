@@ -1,6 +1,6 @@
 tests/mods
-tests/cache
-.venv/
-.vscode/
+tests/newMods
+tests/backup
+.*
 __pycache__/
 *.log
