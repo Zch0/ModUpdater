@@ -13,8 +13,7 @@ import unicodedata
 import asyncio
 from typing import Dict, Any, Callable
 
-import get_mod_info
-import read_mod
+from . import get_mod_info,read_mod
 
 
 logging.basicConfig(
@@ -34,6 +33,14 @@ with open("config.toml", "rb") as f:
 def exit_gui() -> None:
     raise SystemExit
 
+def reload_config(stdscr: curses.window) -> None:
+    global config
+    with open("config.toml", "rb") as f:
+        config = tomllib.load(f)
+    stdscr.clear()
+    stdscr.addstr(0, 0, "配置文件已重新加载。按任意键返回...")
+    stdscr.refresh()
+    stdscr.getch()
 
 def get_mod_dict(mod_folder: str) -> dict[str, dict]:
     mod_dict: Dict[str, dict] = {}
@@ -58,10 +65,9 @@ def get_display_length(s: str) -> int:
     return sum(2 if unicodedata.east_asian_width(c) in ('F', 'W') else 1 for c in s)
 
 
-def display_mod_list(stdscr: Any) -> None:
+def display_mod_list(stdscr: curses.window) -> None:
     mod_dict = get_mod_dict(config["modFolderFrom"])
     mod_list = list(mod_dict.items())
-    from tools import get_display_length
     pos = 0
     while True:
         stdscr.clear()
@@ -98,7 +104,7 @@ def display_mod_list(stdscr: Any) -> None:
                 pos += 1
 
 
-def set_update_source(platform: str, stdscr: Any) -> None:
+def set_update_source(platform: str, stdscr: curses.window) -> None:
     config["update_from"] = platform
     with open("config.toml", "wb") as f:
         tomli_w.dump(config, f)
@@ -107,36 +113,8 @@ def set_update_source(platform: str, stdscr: Any) -> None:
     stdscr.getch()
 
 
-def set_mod_directory(stdscr: Any, prompt: str = "请输入mods目录路径") -> str:
-    while True:
-        curses.echo()
-        stdscr.clear()
-        h, w = stdscr.getmaxyx()
-        default_path = config["modFolderFrom"]
-        prompt_full = f"{prompt} (当前: {default_path}，直接回车使用)"
-        stdscr.addstr(h // 2 - 1, w // 2 - len(prompt_full) // 2, prompt_full)
-        stdscr.refresh()
-        stdscr.move(h // 2, w // 2 - 20)
-        path = stdscr.getstr(h // 2, w // 2 - 20, 40).decode('utf-8').strip()
-        curses.noecho()
-        if not path:
-            path = default_path
-        if os.path.isdir(path):
-            config["modFolderFrom"] = path
-            with open("config.toml", "wb") as f:
-                tomli_w.dump(config, f)
-            stdscr.addstr(h // 2 + 2, w // 2 - 10, f"已设置: {path}")
-            stdscr.refresh()
-            stdscr.getch()
-            return path
-        else:
-            stdscr.addstr(h // 2 + 2, w // 2 - 12, f"目录不存在: {path}")
-            stdscr.addstr(h // 2 + 3, w // 2 - 12, "按任意键重新输入...")
-            stdscr.refresh()
-            stdscr.getch()
 
-
-def check_update(stdscr: Any) -> None:
+def check_update(stdscr: curses.window) -> None:
     mod_dict = get_mod_dict(config.get("modFolderFrom"))
     update_done = threading.Event()
 
@@ -283,7 +261,7 @@ def check_update(stdscr: Any) -> None:
     stdscr.nodelay(False)  # 恢复阻塞模式
 
 
-def choose_update_mods(stdscr: Any, mod_dict: dict) -> None:
+def choose_update_mods(stdscr: curses.window, mod_dict: dict) -> None:
     # 只显示有可用更新的mod
     update_mods = [
         (name, mod_dict[name])
@@ -444,7 +422,7 @@ def choose_update_mods(stdscr: Any, mod_dict: dict) -> None:
                     return  # 直接返回主菜单
 
 
-def start_update_mods(stdscr: Any, selected_mods: list) -> None:
+def start_update_mods(stdscr: curses.window, selected_mods: list) -> None:
     import shutil
     input_mod_folder = config["modFolderFrom"]
     output_mod_folder = config["modFolderTo"]
@@ -501,7 +479,7 @@ def start_update_mods(stdscr: Any, selected_mods: list) -> None:
     # 返回主菜单（直接 return 即可，主流程会回到主菜单）
 
 
-def update_mod(mod_version: Any, mod_local_name: str, stdscr: Any = None) -> None:
+def update_mod(mod_version: Any, mod_local_name: str, stdscr: curses.window = None) -> None:
     input_mod_folder = config["modFolderFrom"]
     output_mod_folder = config["modFolderTo"]
     backup_folder = config["backupFolder"]
@@ -511,7 +489,7 @@ def update_mod(mod_version: Any, mod_local_name: str, stdscr: Any = None) -> Non
                    backup_folder=backup_folder, mod_file=mod_local_name)
 
 
-def download_mod(mod_folder: str, cache_folder: str, mod_version: Any, stdscr: Any = None, progress_line: int = 1) -> None:
+def download_mod(mod_folder: str, cache_folder: str, mod_version: Any, stdscr: curses.window = None, progress_line: int = 1) -> None:
     mod_folder = Path(mod_folder)
     cache_folder = Path(cache_folder)
     mod_file = mod_version.files[0]
