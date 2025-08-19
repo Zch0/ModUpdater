@@ -1,6 +1,8 @@
+from modrinth_api_wrapper import Client
 import os
 import hashlib
 from typing import Optional, Any, List
+
 
 def get_file_sha1(filepath: str) -> str:
     sha1 = hashlib.sha1()
@@ -9,7 +11,6 @@ def get_file_sha1(filepath: str) -> str:
             sha1.update(chunk)
     return sha1.hexdigest()
 
-from modrinth_api_wrapper import Client
 
 def get_mod_current_version(mod_folder: str, mod_file: str) -> Any | None:
     client = Client()
@@ -23,15 +24,18 @@ def get_mod_current_version(mod_folder: str, mod_file: str) -> Any | None:
         return None
     return version_info
 
+
 def get_mod_project_id(version_info: Any) -> str | None:
     if not version_info:
         return None
     return getattr(version_info, "project_id", None)
 
+
 def get_mod_version_number(version_info: Any) -> str | None:
     if not version_info:
         return None
     return getattr(version_info, "version_number", None)
+
 
 def get_mod_versions_by_id(project_id: str) -> list[Any]:
     client = Client()
@@ -43,6 +47,7 @@ def get_mod_versions_by_id(project_id: str) -> list[Any]:
             continue
         versions.append(version)
     return versions
+
 
 def get_mod_latest_version(project_id: str, game_version: str) -> Any | None:
     versions = get_mod_versions_by_id(project_id)

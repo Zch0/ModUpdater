@@ -1,25 +1,25 @@
 import curses
 from typing import Any, Callable, List, Dict, Optional
-from tools import check_update, display_mod_list, exit_gui, get_display_length, set_mod_directory, set_update_source
 
+from .tools import check_update, display_mod_list, exit_gui, get_display_length, set_mod_directory, set_update_source
 MENU_ITEMS: list[dict[str, Any]] = [
     {"name": "检查更新", "action": "check_update"},
     {"name": "查看mod列表", "action": "display_mod_list"},
-    {
-        "name": "设置",
-        "submenu": [
-            {"name": "mod目录", "action": "set_mod_directory"},
-            {"name": "更新来源", "submenu": [
-                {"name": "Modrinth", "action": "set_update_source_modrinth"},
-                {"name": "CurseForge", "action": "set_update_source_curseforge"},
-                {"name": "返回", "action": "back"}
-            ]},
-            {"name": "返回", "action": "back"}
-        ]
-    },
+    # {
+    #     "name": "设置",
+    #     "submenu": [
+    #         {"name": "mod目录", "action": "set_mod_directory"},
+    #         {"name": "更新来源", "submenu": [
+    #             {"name": "Modrinth", "action": "set_update_source_modrinth"},
+    #             {"name": "CurseForge", "action": "set_update_source_curseforge"},
+    #             {"name": "返回", "action": "back"}
+    #         ]},
+    #         {"name": "返回", "action": "back"}
+    #     ]
+    # },
     {"name": "退出", "action": "exit_gui"}
 ]
-from typing import cast
+
 ACTIONS: dict[str, Callable[..., Any]] = {
     "start_update": lambda: print("开始更新..."),
     "check_update": lambda stdscr: check_update(stdscr),
@@ -92,9 +92,9 @@ def main_loop(stdscr: Any) -> None:
         navigate_menu(stdscr, MENU_ITEMS)
 
 
-def main() -> None:
+def tui() -> None:
     curses.wrapper(main_loop)
 
 
 if __name__ == "__main__":
-    main()
+    tui()

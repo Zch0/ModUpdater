@@ -4,3 +4,4 @@ tests/backup
 .*
 __pycache__/
 *.log
+config.toml

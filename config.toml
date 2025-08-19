@@ -11,6 +11,6 @@ backupFolder = "./tests/backup"
 #缓存目录
 cacheFolder = "./.cache"
 #更新来源
-update_from = "Modrinth"
+updateSource = "Modrinth"
 #最大重试次数
 maxRetries = 5
