@@ -110,23 +110,31 @@ def main_loop(stdscr: curses.window) -> None:
     while True:
         stdscr.clear()
         tui_modules.navigate_menu(MENU_ITEMS)
-def input_loop(stdscr: curses.window) -> None:
+
+
+PROMPT_DICT:dict[str,str]={
+    "updateGameVersionFrom": "原游戏版本",
+    "updateGameVersionTo": "目标游戏版本",
+    "modFolderFrom": "原MOD文件夹路径",
+    "modFolderTo": "目标MOD文件夹路径",
+    "backupFolder": "备份文件夹路径",
+    "cacheFolder": "缓存文件夹路径",
+    "updateSource": "更新源",
+    "maxRetries": "最大重试次数"
+}
+def fill_miss_config_loop(stdscr: curses.window) -> None:
     tui_modules=TUI(stdscr)
     stdscr.clear()
     from tomli_w import dump
     from tomllib import load
-    updateGameVersionFrom=tui_modules.input_module("请输入原游戏版本", "")
-    config=load(open("config.toml", "rb"))
-    config["updateGameVersionFrom"]=updateGameVersionFrom
-    dump(config, open("config.toml", "wb"))
-    stdscr.clear()
-    updateGameVersionTo=tui_modules.input_module("请输入目标游戏版本", "")
-    config=load(open("config.toml", "rb"))
-    config["updateGameVersionTo"]=updateGameVersionTo
+    config = load(open("config.toml", "rb"))
+    for k,v in config.items():
+        if not v:
+            config[k] = tui_modules.input_module(f"请输入{PROMPT_DICT[k]}", "None")
     dump(config, open("config.toml", "wb"))
 def start_menu() -> None:
     curses.wrapper(main_loop)
-def start_input() -> None:
-    curses.wrapper(input_loop)
+def start_fill_miss_config() -> None:
+    curses.wrapper(fill_miss_config_loop)
 if __name__ == "__main__":
     start_menu()

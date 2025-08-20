@@ -1,6 +1,4 @@
-tests/mods
-tests/newMods
-tests/backup
+tests/
 .*
 __pycache__/
 *.log

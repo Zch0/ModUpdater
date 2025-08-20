@@ -8,7 +8,7 @@ def generate_config():
         # 新mod版本
         "updateGameVersionTo": "",
         # 原mod目录
-        "modFolderFrom": "./mods",
+        "modFolderFrom": "",
         # 新mod目录
         "modFolderTo": "./newMods",
         # 备份目录
