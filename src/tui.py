@@ -1,9 +1,3 @@
-'''
-TODO: 
-完成初始化配置文件逻辑，第一次打开需输入部分配置
-将stdscr的传递改成class内传递！！！
-用类封装tui！！！
-'''
 import curses
 from typing import Any, Callable, List, Dict, Optional
 
@@ -29,76 +23,79 @@ MENU_ITEMS: list[dict[str, Any]] = [
 
 ACTIONS: dict[str, Callable[..., Any]] = {
     "start_update": lambda: print("开始更新..."),
-    "check_update": lambda stdscr: check_update(stdscr),
-    "display_mod_list": lambda stdscr: display_mod_list(stdscr),
-    "set_update_source_modrinth": lambda stdscr: (set_update_source("Modrinth", stdscr), navigate_menu(stdscr, MENU_ITEMS[2]["submenu"][1]["submenu"])),
-    "set_update_source_github": lambda stdscr: (set_update_source("Github", stdscr), navigate_menu(stdscr, MENU_ITEMS[2]["submenu"][1]["submenu"])),
-    "reload_config": lambda stdscr: (reload_config(stdscr)),
-    "exit_gui": lambda stdscr: exit_gui(),
-    "back": lambda stdscr: None
+    "check_update": lambda: check_update(tui_modules.stdscr),
+    "display_mod_list": lambda: display_mod_list(tui_modules.stdscr),
+    "set_update_source_modrinth": lambda: (set_update_source("Modrinth", tui_modules.stdscr), tui_modules.navigate_menu(MENU_ITEMS[2]["submenu"][1]["submenu"])),
+    "set_update_source_github": lambda: (set_update_source("Github", tui_modules.stdscr), tui_modules.navigate_menu(MENU_ITEMS[2]["submenu"][1]["submenu"])),
+    "reload_config": lambda: (reload_config(tui_modules.stdscr)),
+    "exit_gui": lambda: exit_gui(),
+    "back": lambda: None
 }
-def print_menu(stdscr: curses.window, selected_row_idx: int, menu: list[dict[str, Any]], offset: int = 0) -> None:
-    stdscr.clear()
-    h, w = stdscr.getmaxyx()
+class TUI:
+    def __init__(self,stdscr:curses.window):
+        self.stdscr: curses.window = stdscr
+    def print_menu(self, selected_row_idx: int, menu: list[dict[str, Any]], offset: int = 0) -> None:
+        self.stdscr.clear()
+        h, w = self.stdscr.getmaxyx()
 
-    for idx, item in enumerate(menu):
-        text = item["name"]
-        text_len = get_display_length(text)
-        x = w // 2 - text_len // 2
-        y = h // 2 - len(menu) // 2 + idx + offset
-        if idx == selected_row_idx:
-            stdscr.attron(curses.color_pair(1))
-            stdscr.addstr(y, x, text)
-            stdscr.attroff(curses.color_pair(1))
-        else:
-            stdscr.addstr(y, x, text)
-    stdscr.refresh()
-
-
-def navigate_menu(stdscr: curses.window, menu: list[dict[str, Any]], parent: list[dict[str, Any]] | None = None) -> None:
-    current_row = 0
-    while True:
-        print_menu(stdscr, current_row, menu)
-        key = stdscr.getch()
-
-        if key == curses.KEY_UP:
-            current_row = max(0, current_row - 1)
-        elif key == curses.KEY_DOWN:
-            current_row = min(len(menu) - 1, current_row + 1)
-        elif key == ord('\n'):
-            selected_item = menu[current_row]
-            if selected_item.get("action") == "back":
-                return  # 返回上一级菜单
-            if "submenu" in selected_item:
-                navigate_menu(stdscr, selected_item["submenu"], parent=menu)
+        for idx, item in enumerate(menu):
+            text = item["name"]
+            text_len = get_display_length(text)
+            x = w // 2 - text_len // 2
+            y = h // 2 - len(menu) // 2 + idx + offset
+            if idx == selected_row_idx:
+                self.stdscr.attron(curses.color_pair(1))
+                self.stdscr.addstr(y, x, text)
+                self.stdscr.attroff(curses.color_pair(1))
             else:
-                action = selected_item["action"]
-                func = ACTIONS.get(action)
-                if func:
-                    func(stdscr)
-                else:
-                    stdscr.addstr(0, 0, "Unknown Action")
-                    stdscr.refresh()
-                    stdscr.getch()
-                return
+                self.stdscr.addstr(y, x, text)
+        self.stdscr.refresh()
 
-def input_module(stdscr: curses.window, prompt: str, default: str) -> str:
-    while True:
-        curses.echo()
-        stdscr.clear()
-        h, w = stdscr.getmaxyx()
-        prompt_full = f"{prompt} (当前: {default}，直接回车使用)"
-        stdscr.addstr(h // 2 - 1, w // 2 - len(prompt_full) // 2, prompt_full)
-        stdscr.refresh()
-        stdscr.move(h // 2, w // 2 - 20)
-        current = stdscr.getstr(h // 2, w // 2 - 20, 40).decode('utf-8').strip()
-        curses.noecho()
-        if not current:
-            current = default
-        stdscr.addstr(h // 2 + 2, w // 2 - 10, f"已设置: {current}")
-        stdscr.refresh()
-        stdscr.getch()
-        return current
+
+    def navigate_menu(self, menu: list[dict[str, Any]], parent: list[dict[str, Any]] | None = None) -> None:
+        current_row = 0
+        while True:
+            self.print_menu(current_row, menu)
+            key = self.stdscr.getch()
+
+            if key == curses.KEY_UP:
+                current_row = max(0, current_row - 1)
+            elif key == curses.KEY_DOWN:
+                current_row = min(len(menu) - 1, current_row + 1)
+            elif key == ord('\n'):
+                selected_item = menu[current_row]
+                if selected_item.get("action") == "back":
+                    return  # 返回上一级菜单
+                if "submenu" in selected_item:
+                    self.navigate_menu(selected_item["submenu"], parent=menu)
+                else:
+                    action = selected_item["action"]
+                    func = ACTIONS.get(action)
+                    if func:
+                        func()
+                    else:
+                        self.stdscr.addstr(0, 0, "Unknown Action")
+                        self.stdscr.refresh()
+                        self.stdscr.getch()
+                    return
+
+    def input_module(self, prompt: str, default: str) -> str:
+        while True:
+            curses.echo()
+            self.stdscr.clear()
+            h, w = self.stdscr.getmaxyx()
+            prompt_full = f"{prompt} (当前: {default}，直接回车使用)"
+            self.stdscr.addstr(h // 2 - 1, w // 2 - len(prompt_full) // 2, prompt_full)
+            self.stdscr.refresh()
+            self.stdscr.move(h // 2, w // 2 - 20)
+            current = self.stdscr.getstr(h // 2, w // 2 - 20, 40).decode('utf-8').strip()
+            curses.noecho()
+            if not current:
+                current = default
+            self.stdscr.addstr(h // 2 + 2, w // 2 - 10, f"已设置: {current}")
+            self.stdscr.refresh()
+            self.stdscr.getch()
+            return current
 def main_loop(stdscr: curses.window) -> None:
     curses.curs_set(0)
     curses.start_color()
@@ -108,12 +105,28 @@ def main_loop(stdscr: curses.window) -> None:
         curses.init_pair(3, curses.COLOR_RED, curses.COLOR_BLACK)
         curses.init_pair(4, curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(5, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+    global tui_modules
+    tui_modules=TUI(stdscr)
     while True:
         stdscr.clear()
-        navigate_menu(stdscr, MENU_ITEMS)
-
-
-def tui() -> None:
+        tui_modules.navigate_menu(MENU_ITEMS)
+def input_loop(stdscr: curses.window) -> None:
+    tui_modules=TUI(stdscr)
+    stdscr.clear()
+    from tomli_w import dump
+    from tomllib import load
+    updateGameVersionFrom=tui_modules.input_module("请输入原游戏版本", "")
+    config=load(open("config.toml", "rb"))
+    config["updateGameVersionFrom"]=updateGameVersionFrom
+    dump(config, open("config.toml", "wb"))
+    stdscr.clear()
+    updateGameVersionTo=tui_modules.input_module("请输入目标游戏版本", "")
+    config=load(open("config.toml", "rb"))
+    config["updateGameVersionTo"]=updateGameVersionTo
+    dump(config, open("config.toml", "wb"))
+def start_menu() -> None:
     curses.wrapper(main_loop)
+def start_input() -> None:
+    curses.wrapper(input_loop)
 if __name__ == "__main__":
-    tui()
+    start_menu()
