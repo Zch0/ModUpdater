@@ -13,7 +13,7 @@ import unicodedata
 import asyncio
 from typing import Dict, Any, Callable
 
-from . import get_mod_info,read_mod
+from . import get_mod_info, read_mod
 
 
 logging.basicConfig(
@@ -33,6 +33,7 @@ with open("config.toml", "rb") as f:
 def exit_gui() -> None:
     raise SystemExit
 
+
 def reload_config(stdscr: curses.window) -> None:
     global config
     with open("config.toml", "rb") as f:
@@ -41,6 +42,7 @@ def reload_config(stdscr: curses.window) -> None:
     stdscr.addstr(0, 0, "配置文件已重新加载。按任意键返回...")
     stdscr.refresh()
     stdscr.getch()
+
 
 def get_mod_dict(mod_folder: str) -> dict[str, dict]:
     mod_dict: Dict[str, dict] = {}
@@ -111,7 +113,6 @@ def set_update_source(platform: str, stdscr: curses.window) -> None:
     stdscr.addstr(0, 0, f"更新来源已设置为{platform}。按任意键返回...")
     stdscr.refresh()
     stdscr.getch()
-
 
 
 def check_update(stdscr: curses.window) -> None:
@@ -499,6 +500,15 @@ def download_mod(mod_folder: str, cache_folder: str, mod_version: Any, stdscr: c
     cache_folder.mkdir(exist_ok=True)
     cache_file_path = cache_folder / file_name
 
+    def verify_hash(file_path):
+        file_hash = get_mod_info.get_file_sha1(file_path)
+        if file_hash != file_sha1:
+            logging.error(
+                f"Hash mismatch for {file_name}: {file_hash} != {file_sha1}")
+            return False
+        else:
+            return True
+
     def show_progress(block_num, block_size, total_size):
         if total_size <= 0:
             percent = 0
@@ -522,23 +532,20 @@ def download_mod(mod_folder: str, cache_folder: str, mod_version: Any, stdscr: c
             stdout.flush()
             if percent == 100:
                 print()  # 换行
-
+    mod_file_path = mod_folder / file_name
+    if mod_file_path.exists():
+        if verify_hash(mod_file_path):
+            logging.info(
+                f"File {file_name} already exists in {mod_folder}, skipping download.")
+            return
+        else:
+            logging.info(f"Redownloading {file_name} due to hash mismatch.")
     logging.info(f"Downloading {file_name} from {file_url} to {cache_folder}")
     urllib.request.urlretrieve(
         file_url, cache_file_path, reporthook=show_progress)
     logging.info(f"Downloaded {file_name} to {cache_folder}")
-    downloaded_file_hash = get_mod_info.get_file_sha1(cache_file_path)
-    if downloaded_file_hash != file_sha1:
-        logging.error(
-            f"Hash mismatch for {file_name}: {downloaded_file_hash} != {file_sha1}")
-        return False
-    mod_file_path = mod_folder / file_name
-    if not mod_file_path.exists():
-        logging.info(f"Moving {file_name} to {mod_folder}")
-        os.rename(cache_file_path, mod_file_path)
-    else:
-        logging.warning(
-            f"File {file_name} already exists in {mod_folder}, skipping download.")
+    shutil.move(cache_file_path, mod_file_path)
+    logging.info(f"Moved {file_name} to {mod_folder}")
 
 
 def backup_old_mod(mod_folder: str, backup_folder: str, mod_file: str) -> None:
