@@ -1,7 +1,7 @@
 from modrinth_api_wrapper import Client
 import os
 import hashlib
-from typing import Optional, Any, List
+from typing import Any, List
 
 
 def get_file_sha1(filepath: str) -> str:

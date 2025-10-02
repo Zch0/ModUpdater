@@ -45,6 +45,9 @@ def reload_config(stdscr: curses.window) -> None:
 
 def get_mod_dict(mod_folder: str) -> dict[str, dict]:
     mod_dict: Dict[str, dict] = {}
+    if not os.path.isdir(mod_folder):
+        logging.error(f"Mod folder '{mod_folder}' does not exist or is not a directory.")
+        raise NotADirectoryError(f"Mod folder '{mod_folder}' does not exist or is not a directory.")
     for mod_file in os.listdir(mod_folder):
         if mod_file.endswith(".jar"):
             try:
