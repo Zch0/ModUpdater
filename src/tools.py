@@ -4,9 +4,8 @@ import logging
 import os
 from pathlib import Path
 import shutil
-import tomllib
+import tomlkit
 import urllib.request
-import tomli_w
 import urllib
 import curses
 import unicodedata
@@ -25,7 +24,7 @@ logging.basicConfig(
 )
 
 with open("config.toml", "rb") as f:
-    config: dict = tomllib.load(f)
+    config: dict = tomlkit.load(f)
 # update_game_version_from = config["updateGameVersionFrom"]
 # update_game_version_to = config["updateGameVersionTo"]
 
@@ -37,7 +36,7 @@ def exit_gui() -> None:
 def reload_config(stdscr: curses.window) -> None:
     global config
     with open("config.toml", "rb") as f:
-        config = tomllib.load(f)
+        config = tomlkit.load(f)
     stdscr.clear()
     stdscr.addstr(0, 0, "配置文件已重新加载。按任意键返回...")
     stdscr.refresh()
@@ -109,7 +108,7 @@ def display_mod_list(stdscr: curses.window) -> None:
 def set_update_source(platform: str, stdscr: curses.window) -> None:
     config["update_from"] = platform
     with open("config.toml", "wb") as f:
-        tomli_w.dump(config, f)
+        tomlkit.dump(config, f)
     stdscr.addstr(0, 0, f"更新来源已设置为{platform}。按任意键返回...")
     stdscr.refresh()
     stdscr.getch()

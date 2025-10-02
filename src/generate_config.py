@@ -1,23 +1,15 @@
-import tomli_w
+import tomlkit
 
 
 def generate_config():
-    config = {
-        # 原mod版本
-        "updateGameVersionFrom": "",
-        # 新mod版本
-        "updateGameVersionTo": "",
-        # 原mod目录
-        "modFolderFrom": "",
-        # 新mod目录
-        "modFolderTo": "./newMods",
-        # 备份目录
-        "backupFolder": "./backup",
-        # 缓存目录
-        "cacheFolder": "./.cache",
-        # 更新来源
-        "updateSource": "Modrinth",
-        # 最大重试次数
-        "maxRetries": 5
-    }
-    tomli_w.dump(config, open("config.toml", "wb"))
+    config=tomlkit.document()
+    config["updateGameVersionFrom"]=tomlkit.item("").comment("旧mod版本")
+    config["updateGameVersionTo"]=tomlkit.item("").comment("新mod版本")
+    config["modFolderFrom"]=tomlkit.item("").comment("旧mod目录")
+    config["modFolderTo"]=tomlkit.item("./newMods").comment("新mod目录")
+    config["backupFolder"]=tomlkit.item("./backup").comment("备份目录")
+    config["cacheFolder"]=tomlkit.item("./.cache").comment("缓存目录")
+    config["updateSource"]=tomlkit.item("Modrinth").comment("更新来源")
+    config["maxRetries"]=tomlkit.item(5).comment("最大重试次数")
+    with open("config.toml", "w") as f:
+        tomlkit.dump(config,f)

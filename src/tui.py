@@ -122,19 +122,20 @@ PROMPT_DICT:dict[str,str]={
     "updateSource": "更新源",
     "maxRetries": "最大重试次数"
 }
-def fill_miss_config_loop(stdscr: curses.window) -> None:
+def fill_missing_config_loop(stdscr: curses.window) -> None:
     tui_modules=TUI(stdscr)
     stdscr.clear()
-    from tomli_w import dump
-    from tomllib import load
-    config = load(open("config.toml", "rb"))
+    import tomlkit
+    with open("config.toml", "rb") as f:
+        config = tomlkit.load(f)
     for k,v in config.items():
         if not v:
-            config[k] = tui_modules.input_module(f"请输入{PROMPT_DICT[k]}", "None")
-    dump(config, open("config.toml", "wb"))
+            config[k] = tui_modules.input_module(f"请输入{v.trivia.comment.lstrip("# ").rstrip()}", "None")
+    with open("config.toml", "w") as fo:
+        tomlkit.dump(config, fo)
 def start_menu() -> None:
     curses.wrapper(main_loop)
-def start_fill_miss_config() -> None:
-    curses.wrapper(fill_miss_config_loop)
+def start_fill_missing_config() -> None:
+    curses.wrapper(fill_missing_config_loop)
 if __name__ == "__main__":
     start_menu()
