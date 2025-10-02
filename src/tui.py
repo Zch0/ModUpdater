@@ -1,7 +1,7 @@
 import curses
 from typing import Any, Callable, List, Dict, Optional
 
-from .tools import check_update, display_mod_list, exit_gui, get_display_length, set_update_source,reload_config
+from .tools import check_update, display_mod_list, exit_gui, get_display_length, reload_config_gui, set_update_source,reload_config
 MENU_ITEMS: list[dict[str, Any]] = [
     {"name": "检查更新", "action": "check_update"},
     {"name": "查看mod列表", "action": "display_mod_list"},
@@ -27,7 +27,7 @@ ACTIONS: dict[str, Callable[..., Any]] = {
     "display_mod_list": lambda: display_mod_list(tui_modules.stdscr),
     "set_update_source_modrinth": lambda: (set_update_source("Modrinth", tui_modules.stdscr), tui_modules.navigate_menu(MENU_ITEMS[2]["submenu"][1]["submenu"])),
     "set_update_source_github": lambda: (set_update_source("Github", tui_modules.stdscr), tui_modules.navigate_menu(MENU_ITEMS[2]["submenu"][1]["submenu"])),
-    "reload_config": lambda: (reload_config(tui_modules.stdscr)),
+    "reload_config": lambda: reload_config_gui(tui_modules.stdscr),
     "exit_gui": lambda: exit_gui(),
     "back": lambda: None
 }
@@ -84,7 +84,7 @@ class TUI:
             curses.echo()
             self.stdscr.clear()
             h, w = self.stdscr.getmaxyx()
-            prompt_full = f"{prompt} (当前: {default}，直接回车使用)"
+            prompt_full = f"{prompt} (当前: {default} 直接回车使用)"
             self.stdscr.addstr(h // 2 - 1, w // 2 - len(prompt_full) // 2, prompt_full)
             self.stdscr.refresh()
             self.stdscr.move(h // 2, w // 2 - 20)
@@ -130,9 +130,10 @@ def fill_missing_config_loop(stdscr: curses.window) -> None:
         config = tomlkit.load(f)
     for k,v in config.items():
         if not v:
-            config[k] = tui_modules.input_module(f"请输入{v.trivia.comment.lstrip("# ").rstrip()}", "None")
+            config[k] = tui_modules.input_module(f"请输入{v.trivia.comment.lstrip("# ").rstrip()}", v.value)
     with open("config.toml", "w") as fo:
         tomlkit.dump(config, fo)
+    reload_config()
 def start_menu() -> None:
     curses.wrapper(main_loop)
 def start_fill_missing_config() -> None:

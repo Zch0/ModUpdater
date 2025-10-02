@@ -33,15 +33,16 @@ def exit_gui() -> None:
     raise SystemExit
 
 
-def reload_config(stdscr: curses.window) -> None:
+def reload_config() -> None:
     global config
     with open("config.toml", "rb") as f:
         config = tomlkit.load(f)
+def reload_config_gui(stdscr: curses.window) -> None:
+    reload_config()
     stdscr.clear()
     stdscr.addstr(0, 0, "配置文件已重新加载。按任意键返回...")
     stdscr.refresh()
     stdscr.getch()
-
 
 def get_mod_dict(mod_folder: str) -> dict[str, dict]:
     mod_dict: Dict[str, dict] = {}
@@ -493,13 +494,14 @@ def update_mod(mod_version: Any, mod_local_name: str, stdscr: curses.window = No
 
 
 def download_mod(mod_folder: str, cache_folder: str, mod_version: Any, stdscr: curses.window = None, progress_line: int = 1) -> None:
-    mod_folder = Path(mod_folder)
-    cache_folder = Path(cache_folder)
+    mod_folder: Path = Path(mod_folder)
+    cache_folder: Path = Path(cache_folder)
     mod_file = mod_version.files[0]
     file_sha1 = mod_file.hashes.sha1
     file_url = mod_file.url
     file_name = mod_file.filename
-    cache_folder.mkdir(exist_ok=True)
+    mod_folder.mkdir(parents=True, exist_ok=True)
+    cache_folder.mkdir(parents=True,exist_ok=True)
     cache_file_path = cache_folder / file_name
 
     def verify_hash(file_path):
@@ -542,6 +544,14 @@ def download_mod(mod_folder: str, cache_folder: str, mod_version: Any, stdscr: c
             return
         else:
             logging.info(f"Redownloading {file_name} due to hash mismatch.")
+    if cache_file_path.exists():
+        if verify_hash(cache_file_path):
+            logging.info(
+                f"File {file_name} already exists in cache, moving to {mod_folder}.")
+            shutil.move(cache_file_path, mod_file_path)
+            return
+        else:
+            logging.info(f"Redownloading {file_name} due to hash mismatch.")
     logging.info(f"Downloading {file_name} from {file_url} to {cache_folder}")
     urllib.request.urlretrieve(
         file_url, cache_file_path, reporthook=show_progress)
@@ -551,12 +561,12 @@ def download_mod(mod_folder: str, cache_folder: str, mod_version: Any, stdscr: c
 
 
 def backup_old_mod(mod_folder: str, backup_folder: str, mod_file: str) -> None:
-    mod_path = Path(mod_folder) / mod_file
+    mod_path:Path = Path(mod_folder) / mod_file
     if not mod_path.exists():
         logging.warning(f"Mod file {mod_file} does not exist in {mod_folder}.")
         return
-    backup_folder = Path(backup_folder)
-    backup_folder.mkdir(exist_ok=True)
+    backup_folder:Path = Path(backup_folder)
+    backup_folder.mkdir(parents=True,exist_ok=True)
     backup_path = backup_folder / mod_file
     if backup_path.exists():
         logging.warning(

@@ -3,10 +3,10 @@ import tomlkit
 
 def generate_config():
     config=tomlkit.document()
-    config["updateGameVersionFrom"]=tomlkit.item("").comment("旧mod版本")
-    config["updateGameVersionTo"]=tomlkit.item("").comment("新mod版本")
-    config["modFolderFrom"]=tomlkit.item("").comment("旧mod目录")
-    config["modFolderTo"]=tomlkit.item("./newMods").comment("新mod目录")
+    config["updateGameVersionFrom"]=tomlkit.item("").comment("源mod版本")
+    config["updateGameVersionTo"]=tomlkit.item("").comment("目标mod版本")
+    config["modFolderFrom"]=tomlkit.item("").comment("源mod目录")
+    config["modFolderTo"]=tomlkit.item("").comment("目标mod目录")
     config["backupFolder"]=tomlkit.item("./backup").comment("备份目录")
     config["cacheFolder"]=tomlkit.item("./.cache").comment("缓存目录")
     config["updateSource"]=tomlkit.item("Modrinth").comment("更新来源")
